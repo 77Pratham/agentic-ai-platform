@@ -1,0 +1,3 @@
+January sales increased by 12% compared to December.
+Top product was Model X with 340 units sold.
+Customer churn decreased by 3%.

@@ -15,8 +15,8 @@ def generate_plan(user_input: str) -> dict:
         steps.append(
             PlanStep(
                 id="s1",
-                action="retrieve_documents",
-                params={"source": "local"},
+                action="rag_query",
+                params={"query": user_input},
                 verify="documents_loaded"
             )
         )
@@ -24,10 +24,11 @@ def generate_plan(user_input: str) -> dict:
             PlanStep(
                 id="s2",
                 action="generate_report",
-                params={"format": "pdf"},
+                params={"context": "$s1.context"},
                 verify="file_exists"
             )
         )
+
 
     if "email" in text or "send" in text:
         steps.append(
