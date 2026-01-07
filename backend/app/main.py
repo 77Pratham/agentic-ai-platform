@@ -3,9 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.planner.planner import generate_plan
 import json
 import asyncio
-from app.executor import execute_step
+from app.state import init_db, save_execution
+from app.executor import execute_plan
 
 app = FastAPI(title="Agentic AI Backend")
+
+@app.on_event("startup")
+def startup():
+    init_db()
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,28 +35,20 @@ async def websocket_endpoint(ws: WebSocket):
             # Generate plan dynamically
             plan = generate_plan(user_message)
 
-            # Stream steps one by one
-            # Stream + execute steps
-            for step in plan["steps"]:
-                await ws.send_text(json.dumps({
-                    "type": "step_started",
-                    "data": step
-                }))
+            # Execute plan
+            result = execute_plan(plan)
 
-                execution = execute_step(step)
+            save_execution(
+                exec_id=plan["plan_id"],
+                plan=plan,
+                current_step=len(plan["steps"]),
+                status=result["status"]
+            )
 
-                await ws.send_text(json.dumps({
-                    "type": "step_result",
-                    "data": execution
-                }))
-
-                if not execution["verified"]:
-                    await ws.send_text(json.dumps({
-                        "type": "execution_paused",
-                        "reason": "verification_failed",
-                        "step": step
-                    }))
-                    return
+            await ws.send_text(json.dumps({
+                "type": "execution_result",
+                "data": result
+            }))
 
 
     except Exception as e:

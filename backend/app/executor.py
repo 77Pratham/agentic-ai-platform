@@ -1,24 +1,38 @@
 from app.actions_registry import ACTION_REGISTRY
 from app.utils.verifier import verify
-import time
 
-def execute_step(step: dict) -> dict:
-    action = step["action"]
-    params = step["params"]
-    verify_rule = step["verify"]
+def resolve_params(params, context):
+    resolved = {}
+    for k, v in params.items():
+        if isinstance(v, str) and v.startswith("$"):
+            step_id, field = v[1:].split(".")
+            resolved[k] = context[step_id][field]
+        else:
+            resolved[k] = v
+    return resolved
 
-    if action not in ACTION_REGISTRY:
-        raise Exception(f"Unknown action: {action}")
+def execute_plan(plan):
+    context = {}
 
-    # Execute
-    result = ACTION_REGISTRY[action](params)
+    for step in plan["steps"]:
+        action = step["action"]
+        verify_rule = step["verify"]
 
-    # Verify
-    success = verify(action, result, verify_rule)
+        params = resolve_params(step["params"], context)
+
+        result = ACTION_REGISTRY[action](params)
+        success = verify(action, result, verify_rule)
+
+        context[step["id"]] = result
+
+        if not success:
+            return {
+                "status": "paused",
+                "failed_step": step,
+                "context": context
+            }
 
     return {
-        "action": action,
-        "params": params,
-        "result": result,
-        "verified": success
+        "status": "completed",
+        "context": context
     }
